@@ -1,3 +1,4 @@
+.*sw?
 !Build/
 .last_cover_stats
 /META.yml
@@ -6,6 +7,7 @@
 *.o
 *.pm.tdy
 *.bs
+file-*
 
 # Devel::Cover
 cover_db/
