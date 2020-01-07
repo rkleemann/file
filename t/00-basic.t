@@ -4,15 +4,15 @@ use FindBin ();
 
 use Test2::V0;
 
-ok( require file, 'Can require file module' );
-ok( require pm,   'Can require pm module' );
+ok( require filename, 'Can require filename module' );
+ok( require pm,       'Can require pm module' );
 
 @INC = ( $FindBin::Bin, @INC );
 
 our %inc = %INC;
 my ( %incs, %file, %core );
-$incs{'file->require'} = \%file;
-$incs{'CORE::require'} = \%core;
+$incs{'filename->require'} = \%file;
+$incs{'CORE::require'}     = \%core;
 
 # This hack is because I need them to report the same error message,
 # including filename and line number.
@@ -28,7 +28,7 @@ END
     eval( join(
         ',',
         map { $test =~ s/require/$_/gr =~ s/\s+//gr } qw(
-            file->require
+            filename->require
             CORE::require
         )
     ) );
@@ -37,8 +37,8 @@ END
 {
     $_ = my $filename = "Testing.pm";
 
-    is( &$file, &$core, "Can file->require $filename" );
-    is( \%file, \%core, '%INC is the same for file and CORE' );
+    is( &$file, &$core, "Can filename->require $filename" );
+    is( \%file, \%core, '%INC is the same for filename and CORE' );
 }
 
 {
@@ -52,7 +52,7 @@ END
     eval { file->require($filename) };
     local %inc = %INC;
     is( dies {&$file}, dies {&$core},
-        "Trying to re-file->require an unreadable file fails" );
+        "Trying to re-filename->require an unreadable file fails" );
     is( \%file, \%core, '%INC is the same for file and CORE' );
     chmod( $mode, $filename ) or die "Could not chmod $filename: $!";
 }
@@ -61,12 +61,12 @@ END
     $_ = my $filename = "Testing-empty.pm";
 
     is( dies {&$file}, dies {&$core},
-        "Cannot file->require empty file $filename" );
+        "Cannot filename->require empty file $filename" );
     is( \%file, \%core, '%INC is the same for file and CORE' );
-    eval { file->require($filename) };
+    eval { filename->require($filename) };
     local %inc = %INC;
     is( dies {&$file}, dies {&$core},
-        "Trying to re-file->require an empty file fails" );
+        "Trying to re-filename->require an empty file fails" );
     is( \%file, \%core, '%INC is the same for file and CORE' );
 }
 
@@ -74,12 +74,12 @@ END
     $_ = my $filename = "Testing-failure.pm";
 
     is( dies {&$file}, dies {&$core},
-        "Cannot file->require failing file $filename" );
+        "Cannot filename->require failing file $filename" );
     is( \%file, \%core, '%INC is the same for file and CORE' );
-    eval { file->require($filename) };
+    eval { filename->require($filename) };
     local %inc = %INC;
     is( dies {&$file}, dies {&$core},
-        "Trying to re-file->require a failing file fails" );
+        "Trying to re-filename->require a failing file fails" );
     is( \%file, \%core, '%INC is the same for file and CORE' );
 }
 

@@ -23,14 +23,12 @@ package pm;
 
 =head1 DESCRIPTION
 
-This is just an alias to the L<file> module.
-See L<file> for a complete description for how to use this module.
+This is just an alias to the L<filename> module.
+See L<filename> for a complete description for how to use this module.
 
 =cut
 
-use file ();
-
-*pm = *file;
+use parent 'filename';
 
 1;
 

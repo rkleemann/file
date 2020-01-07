@@ -7,7 +7,7 @@
 *.o
 *.pm.tdy
 *.bs
-file-*
+filename-*
 
 # Devel::Cover
 cover_db/

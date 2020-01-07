@@ -2,24 +2,24 @@
 use strict;
 use warnings;
 
-package file;
+package filename;
 # ABSTRACT: Perl module to load files at compile-time, without BEGIN blocks.
 
 =head1 SYNOPSIS
 
     # Instead of "BEGIN { require '/path/to/file.pm' }"
     # use the more succinct:
-    use file '/path/to/file.pm';
+    use filename '/path/to/file.pm';
 
     # Or, if you need to do include a file relative to the program:
     use FindBin qw($Bin);
-    use file "$Bin/../lib/Application.pm";
+    use filename "$Bin/../lib/Application.pm";
 
     # Do it at runtime:
-    file->require('/path/to/file.pm');
+    filename->require('/path/to/file.pm');
 
     # Throw it into a loop:
-    say( 'Required: ', $_ ) foreach grep file->require, @files;
+    say( 'Required: ', $_ ) foreach grep filename->require, @files;
 
 =head1 DESCRIPTION
 
@@ -42,14 +42,15 @@ use Carp ();
 Does the equivalent of L<perlfunc/require> on the supplied C<$filename>,
 or C<$_> if no argument is provided.
 
-Must be called as a class method: C<< file->require( $filename ) >>
+Must be called as a class method: C<< filename->require( $filename ) >>
 
 =cut
 
 # Modified version of the code as specified in `perldoc -f require`
 *import = \&require;
 sub require {
-    shift;    # Class
+    eval { $_[0]->isa(__PACKAGE__) } && shift
+        || Carp::croak( $_[0], " is not a ", __PACKAGE__ );
     my $filename = @_ ? shift : $_;
     Carp::croak("Null filename used") unless length($filename);
     if (exists $INC{$filename}) {
