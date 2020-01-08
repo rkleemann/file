@@ -17,7 +17,7 @@ $incs{'CORE::require'}     = \%core;
 # This hack is because I need them to report the same error message,
 # including filename and line number.
 my ( $file, $core ) = do {
-    my $test = <<'END';
+    ( my $test = <<'END' ) =~ s/\s+//g;
 sub {
     local %INC = %inc;
     my $return = require;
@@ -27,60 +27,49 @@ sub {
 END
     eval( join(
         ',',
-        map { $test =~ s/require/$_/gr =~ s/\s+//gr } qw(
+        map { ( my $sub = $test ) =~ s/require/$_/g; $sub } qw(
             filename->require
             CORE::require
         )
     ) );
 };
 
-{
-    $_ = my $filename = "Testing.pm";
+foreach my $prefix ( "", "$FindBin::Bin/" ) {
 
-    is( &$file, &$core, "Can filename->require $filename" );
-    is( \%file, \%core, '%INC is the same for filename and CORE' );
-}
+    {
+        $_ = my $filename = $prefix . "Testing.pm";
 
-{
-    $_ = my $filename = "$FindBin::Bin/Testing.pm";
+        is( &$file, &$core, "Can filename->require $filename" );
+        is( \%file, \%core, '%INC is the same for filename and CORE' );
 
-    my $mode = ( stat $filename )[2] & 07777 || die "Cannot stat $filename";
-    chmod( 00000, $filename ) or die "Could not chmod $filename: $!";
-    is( dies {&$file}, dies {&$core},
-        "Cannot file->require unreadable $filename" );
-    is( \%file, \%core, '%INC is the same for file and CORE' );
-    eval { file->require($filename) };
-    local %inc = %INC;
-    is( dies {&$file}, dies {&$core},
-        "Trying to re-filename->require an unreadable file fails" );
-    is( \%file, \%core, '%INC is the same for file and CORE' );
-    chmod( $mode, $filename ) or die "Could not chmod $filename: $!";
-}
+        my $statname = ( $prefix ? "" : "$FindBin::Bin/" ) . $filename;
+        my $mode = ( stat $statname )[2] & 07777
+            || die "Cannot stat $statname";
+        chmod( 00000, $statname ) or die "Could not chmod $statname: $!";
+        is( dies {&$file}, dies {&$core},
+            "Cannot file->require unreadable $filename" );
+        is( \%file, \%core, '%INC is the same for file and CORE' );
+        eval { file->require($filename) };
+        local %inc = %INC;
+        is( dies {&$file}, dies {&$core},
+            "Trying to re-filename->require an unreadable file fails" );
+        is( \%file, \%core, '%INC is the same for file and CORE' );
+        chmod( $mode, $statname ) or die "Could not chmod $statname: $!";
+    }
 
-{
-    $_ = my $filename = "Testing-empty.pm";
+    foreach my $pm (qw( Testing-empty.pm Testing-failure.pm )) {
+        $_ = my $filename = $prefix . $pm;
 
-    is( dies {&$file}, dies {&$core},
-        "Cannot filename->require empty file $filename" );
-    is( \%file, \%core, '%INC is the same for file and CORE' );
-    eval { filename->require($filename) };
-    local %inc = %INC;
-    is( dies {&$file}, dies {&$core},
-        "Trying to re-filename->require an empty file fails" );
-    is( \%file, \%core, '%INC is the same for file and CORE' );
-}
+        is( dies {&$file}, dies {&$core},
+            "Cannot filename->require $filename" );
+        is( \%file, \%core, '%INC is the same for file and CORE' );
+        eval { filename->require($filename) };
+        local %inc = %INC;
+        is( dies {&$file}, dies {&$core},
+            "Trying to re-filename->require $filename" );
+        is( \%file, \%core, '%INC is the same for file and CORE' );
+    }
 
-{
-    $_ = my $filename = "Testing-failure.pm";
-
-    is( dies {&$file}, dies {&$core},
-        "Cannot filename->require failing file $filename" );
-    is( \%file, \%core, '%INC is the same for file and CORE' );
-    eval { filename->require($filename) };
-    local %inc = %INC;
-    is( dies {&$file}, dies {&$core},
-        "Trying to re-filename->require a failing file fails" );
-    is( \%file, \%core, '%INC is the same for file and CORE' );
 }
 
 done_testing();

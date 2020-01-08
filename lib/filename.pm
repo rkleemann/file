@@ -35,7 +35,7 @@ rather than at runtime.
 
 =cut
 
-use Carp ();
+use Carp 1.50 ();
 
 =method C<require( $filename = $_ )>
 
@@ -46,6 +46,8 @@ Must be called as a class method: C<< filename->require( $filename ) >>
 
 =cut
 
+my $error = sub { };    # Private sub
+
 # Modified version of the code as specified in `perldoc -f require`
 *import = \&require;
 sub require {
@@ -53,37 +55,42 @@ sub require {
         || Carp::croak( $_[0], " is not a ", __PACKAGE__ );
     my $filename = @_ ? shift : $_;
     Carp::croak("Null filename used") unless length($filename);
-    if (exists $INC{$filename}) {
-        return 1 if $INC{$filename};
-        return;
+
+    return $INC{$filename} if ( exists $INC{$filename} );
+
+    if ( $filename =~ m!\A/! ) {
+        goto NOT_INC if $^V < v5.17.0 && !-r $filename;
+        return do($filename) || $error->($filename);
     }
-    my $result;
-    ITER: {
-        if ( $filename =~ m!\A/! ) {
-            $result = do $filename;
-            last ITER;
-        }
-        foreach my $prefix (@INC) {
-            next unless -f ( my $fullpath = "$prefix/$filename" );
-            $result = do $fullpath;
-            $INC{$filename} = delete $INC{$fullpath};
-            last ITER;
-        }
+    foreach my $prefix (@INC) {
+        next unless -f ( my $fullpath = "$prefix/$filename" );
+        next if $^V < v5.17.0 && !-r _;
+        my $result = do $fullpath;
+        $INC{$filename} = delete $INC{$fullpath};
+        return $result || $error->( $filename => $fullpath );
+    }
+    NOT_INC:
         Carp::croak("Can't locate $filename in \@INC (\@INC contains: @INC)");
-    }
-    if ($result) {
-        return $result;
-    } elsif ($@) {
-        $INC{$filename} = undef;
-        Carp::croak( $@, "Compilation failed in require" );
-    } elsif ($!) {
-        $INC{$filename} = undef;
-        Carp::croak("Can't locate $filename:   $!");
-    } else {
-        delete $INC{$filename};
-        Carp::croak("$filename did not return a true value");
-    }
 }
+
+# Private sub
+$error = sub {
+    my $filename = @_ ? shift : $_;
+    my $fullpath = @_ ? shift : $filename;
+
+    $INC{$filename} = undef;
+
+    $@ && Carp::croak( $@, "Compilation failed in require" );
+
+    $! && Carp::croak(
+        "Can't locate $filename:   ",
+        $^V >= v5.21.0 ? "$fullpath: " : (),
+        "$!"
+    );
+
+    delete $INC{$filename};
+    Carp::croak( $filename, " did not return a true value" );
+};
 
 1;
 
