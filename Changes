@@ -2,6 +2,13 @@ Revision history for file.
 
 {{$NEXT}}
 
+ - Added even more tests.
+ - Use File::Spec to check for absolute file names.
+
+v0.20.008 2020-01-08
+
+ - Updated code/tests to pass on many more Perls, and for edge cases.
+
 v0.20.007 2020-01-07
 
  - Initial release

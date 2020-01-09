@@ -1,1 +1,2 @@
+# An invalid Perl file
 -

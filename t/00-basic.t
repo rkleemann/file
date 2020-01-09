@@ -36,8 +36,8 @@ END
 
 foreach my $prefix ( "", "$FindBin::Bin/" ) {
 
-    {
-        $_ = my $filename = $prefix . "Testing.pm";
+    foreach my $pm (qw( good symlink )) {
+        $_ = my $filename = sprintf( '%sTesting-%s.pm', $prefix, $pm );
 
         is( &$file, &$core, "Can filename->require $filename" );
         is( \%file, \%core, '%INC is the same for filename and CORE' );
@@ -57,8 +57,16 @@ foreach my $prefix ( "", "$FindBin::Bin/" ) {
         chmod( $mode, $statname ) or die "Could not chmod $statname: $!";
     }
 
-    foreach my $pm (qw( Testing-empty.pm Testing-failure.pm )) {
-        $_ = my $filename = $prefix . $pm;
+    foreach my $pm (qw(
+        empty
+        empty-string
+        errno
+        eval_error
+        failure
+        false
+        undef
+    )) {
+        $_ = my $filename = sprintf( '%sTesting-%s.pm', $prefix, $pm );
 
         is( dies {&$file}, dies {&$core},
             "Cannot filename->require $filename" );

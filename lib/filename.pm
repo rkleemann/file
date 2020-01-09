@@ -35,7 +35,8 @@ rather than at runtime.
 
 =cut
 
-use Carp 1.50 ();
+use Carp 1.50  ();
+use File::Spec ();
 
 =method C<require( $filename = $_ )>
 
@@ -46,7 +47,7 @@ Must be called as a class method: C<< filename->require( $filename ) >>
 
 =cut
 
-my $error = sub { };    # Private sub
+my ( $do, $error ) = ();    # Private subs
 
 # Modified version of the code as specified in `perldoc -f require`
 *import = \&require;
@@ -58,27 +59,46 @@ sub require {
 
     return $INC{$filename} if ( exists $INC{$filename} );
 
-    if ( $filename =~ m!\A/! ) {
+    if ( File::Spec->file_name_is_absolute($filename) ) {
         goto NOT_INC if $^V < v5.17.0 && !-r $filename;
-        return do($filename) || $error->($filename);
+        return $do->($filename);
     }
-    foreach my $prefix (@INC) {
+    foreach my $inc (@INC) {
+        my $prefix = $inc;
+        #if ( my $ref = ref($inc) ) {
+        #    # TODO ...
+        #}
         next unless -f ( my $fullpath = "$prefix/$filename" );
         next if $^V < v5.17.0 && !-r _;
-        my $result = do $fullpath;
-        $INC{$filename} = delete $INC{$fullpath};
-        return $result || $error->( $filename => $fullpath );
+        return $do->( $fullpath => $filename );
     }
     NOT_INC:
         Carp::croak("Can't locate $filename in \@INC (\@INC contains: @INC)");
 }
+
+my $do_text = <<'END';
+package $pkg;
+my $result = do($fullpath);
+die $@ if $@;
+$INC{$filename} = delete $INC{$fullpath}
+    if $filename ne $fullpath && exists $INC{$fullpath};
+$result;
+END
+$do = sub {
+    my $fullpath = @_ ? shift : $_;
+    my $filename = @_ ? shift : $fullpath;
+    my ($pkg)    = caller(2);
+
+    ( my $do_eval = $do_text ) =~ s/\$pkg/$pkg/;
+    return eval $do_eval || $error->( $filename => $fullpath );
+};
 
 # Private sub
 $error = sub {
     my $filename = @_ ? shift : $_;
     my $fullpath = @_ ? shift : $filename;
 
-    $INC{$filename} = undef;
+    $INC{$filename} &&= undef($!);
 
     $@ && Carp::croak( $@, "Compilation failed in require" );
 
@@ -88,11 +108,20 @@ $error = sub {
         "$!"
     );
 
-    delete $INC{$filename};
     Carp::croak( $filename, " did not return a true value" );
 };
 
 1;
 
 __END__
+
+=head1 TODO
+
+=over
+
+=item * Handle references in C<@INC>
+
+=back
+
+=cut
 
