@@ -2,6 +2,11 @@ Revision history for file.
 
 {{$NEXT}}
 
+ - Use `locale` to fix issues with $!.
+ - Fix $VERSION for older Perls.
+
+v0.20.009 2020-01-09
+
  - Added even more tests.
  - Use File::Spec to check for absolute file names.
 
