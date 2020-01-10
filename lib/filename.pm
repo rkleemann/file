@@ -2,6 +2,8 @@
 use strict;
 use warnings;
 
+use locale;    # localize $!
+
 package filename;
 # ABSTRACT: Perl module to load files at compile-time, without BEGIN blocks.
 
