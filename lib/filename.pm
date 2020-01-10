@@ -102,7 +102,7 @@ $error = sub {
     my $filename = @_ ? shift : $_;
     my $fullpath = @_ ? shift : $filename;
 
-    $INC{$filename} &&= undef($!);
+    $INC{$filename} &&= undef($!); # $! is invalid if $INC{$filename} is true.
 
     $@ && Carp::croak( $@, "Compilation failed in require" );
 
