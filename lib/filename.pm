@@ -38,6 +38,10 @@ rather than at runtime.
 use Carp 1.50  ();
 use File::Spec ();
 
+
+# VERSION
+
+
 =method C<require( $filename = $_ )>
 
 Does the equivalent of L<perlfunc/require> on the supplied C<$filename>,
