@@ -1,4 +1,6 @@
 
+use v5.10.1;
+
 use strict;
 use warnings;
 
@@ -13,7 +15,7 @@ package filename;
     # use the more succinct:
     use filename '/path/to/file.pm';
 
-    # Or, if you need to do include a file relative to the program:
+    # Or, if you need to include a file relative to the program:
     use FindBin qw($Bin);
     use filename "$Bin/../lib/Application.pm";
 
@@ -37,8 +39,9 @@ rather than at runtime.
 
 =cut
 
-use Carp 1.50  ();
-use File::Spec ();
+use Carp 1.50    ();
+use File::Spec   ();
+use Scalar::Util ();    #qw( blessed refaddr );
 
 
 # VERSION
@@ -53,7 +56,7 @@ Must be called as a class method: C<< filename->require( $filename ) >>
 
 =cut
 
-my ( $do, $error ) = ();    # Private subs
+my ( $do, $eval, $check_inc, $error ) = ();    # Private subs
 
 # Modified version of the code as specified in `perldoc -f require`
 *import = \&require;
@@ -70,17 +73,84 @@ sub require {
         return $do->($filename);
     }
     foreach my $inc (@INC) {
-        my $prefix = $inc;
-        #if ( my $ref = ref($inc) ) {
-        #    # TODO ...
-        #}
-        next unless -f ( my $fullpath = "$prefix/$filename" );
-        next if $^V < v5.17.0 && !-r _;
-        return $do->( $fullpath => $filename );
+        my ( $fullpath ) = $check_inc->( $inc, $filename );
+        next unless length($fullpath);
+        return ref($fullpath)
+            ? $eval->( $$fullpath => $filename, $inc )
+            : $do->( $fullpath => $filename );
     }
     NOT_INC:
-        Carp::croak("Can't locate $filename in \@INC (\@INC contains: @INC)");
+    my $module = '';
+    if ( ( my $pm = $filename ) =~ s/\.pm\z// ) {
+        $pm =~ s!/!::!g;
+        $module = $pm;
+    }
+    $module = "(you may need to install the $module module) "
+        if $module;
+    Carp::croak("Can't locate $filename in \@INC $module(\@INC contains: @INC)");
 }
+
+### Private subs ###
+
+$check_inc = sub {
+    my ( $inc, $filename ) = @_;
+
+    if ( my $ref = ref($inc) ) {
+        my $subref = undef;
+        if ( defined( my $pkg = Scalar::Util::blessed($inc) ) ) {
+            $subref = $inc->can("INC")
+                or Carp::croak(
+                    qq!Can't locate object method "INC" via package "$pkg"!
+                );
+        } else {
+            $subref
+                = $ref eq 'ARRAY' ? $inc->[0]
+                : $ref eq 'CODE'  ? $inc
+                :                   return;
+        }
+        my @elems = $subref->( $inc, $filename );
+        return unless @elems && ( my $elem_ref = ref( $elems[0] ) );
+        # Possible elements of @elems:
+        # SCALAR - Prepended code
+        # IO     - Filehandle to read
+        # CODE   - Code to execute with IO
+        # REF    - State for CODE
+
+        my $code = '';
+        if ( $elem_ref eq "SCALAR" ) {
+            $code = ${ shift @elems };
+            $elem_ref = ref( $elems[0] );
+        }
+
+        my $fh = undef;
+        if ( $elem_ref eq 'GLOB' ) {
+            $fh = shift @elems;
+            $fh = *{$fh}{IO};
+            $elem_ref = ref( $elems[0] );
+        }
+
+        my $sub   = undef;
+        my $state = undef;
+        if ( $elem_ref eq "CODE" ) {
+            ( $sub, $state ) = @elems;
+
+            local $_;
+            $code .= $_
+                while do { $_ = <$fh> if $fh; $sub->( 0, $state ); };
+        } elsif ($fh) {
+            local $_;
+            $code .= $_ while (<$fh>);
+        }
+
+        return \$code;
+    }
+
+    return unless length($inc);
+    my $fullpath = "$inc/$filename";
+    return unless -f $fullpath;
+    return if $^V < v5.17.0 && !-r _;
+    return $fullpath;
+};
 
 my $do_text = <<'END';
 package $pkg;
@@ -99,7 +169,29 @@ $do = sub {
     return eval $do_eval || $error->( $filename => $fullpath );
 };
 
-# Private sub
+my $eval_text = <<'END';
+package $pkg;
+my $result = eval $code;
+die $@ if $@;
+$INC{$filename} = $inc;
+$result;
+END
+$eval = sub {
+    my $code     = @_ ? shift : $_;
+    my $filename = @_ ? shift : $code;
+    my $inc      = @_ ? shift : $filename;
+    my ($pkg)    = caller(2);
+
+    my $tmpfile = sprintf( '/loader/0x%x/%s',
+        Scalar::Util::refaddr( \$code ),
+        $filename
+    );
+    $code = "#line 0 $tmpfile\n" . $code;
+
+    ( my $eval_eval = $eval_text ) =~ s/\$pkg/$pkg/;
+    return eval $eval_eval || $error->( $filename => $inc );
+};
+
 $error = sub {
     my $filename = @_ ? shift : $_;
     my $fullpath = @_ ? shift : $filename;
@@ -120,14 +212,4 @@ $error = sub {
 1;
 
 __END__
-
-=head1 TODO
-
-=over
-
-=item * Handle references in C<@INC>
-
-=back
-
-=cut
 
