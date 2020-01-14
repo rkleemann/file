@@ -60,8 +60,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 $filename, __FILE__, __LINE__ + 2
             );
             eval { CORE::require($filename) };
-            is( $@, $expected_error,
-                "Failed to filename->require $filename" );
+            is( $@, $expected_error, "Failed to require $filename" );
             local %inc = %INC;
             is( dies {&$file}, dies {&$core},
                 "Trying to re-filename->require an unreadable file fails" );
