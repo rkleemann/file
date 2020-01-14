@@ -52,16 +52,27 @@ foreach my $inc (
     #push @INC, \&looking_for;
 
     foreach my $pm (qw( good symlink )) {
-        $_ = my $filename = sprintf( 'Testing-%s.pm', $pm );
+        my $module = sprintf( 'Testing-%s', $pm );
+        $_ = my $filename = sprintf( '%s.pm', $module );
 
         is( dies {&$file}, dies {&$core},
             "Cannot filename->require $filename" );
         is( \%file, \%core, '%INC is the same for file and CORE' );
 
-        my $expected_error = sprintf(
-            "Can't locate %s:   Permission denied at %s line %d.\n",
-            $filename, __FILE__, __LINE__ + 2
-        );
+        my $expected_error
+            = Scalar::Util::blessed($inc)
+            ? sprintf(
+                  qq!Can't locate object method "INC" via package "%s"!
+                . qq! at %s line %d.\n!,
+                ${$inc}, __FILE__, __LINE__ + 9
+            )
+            : sprintf(
+                  "Can't locate %s in \@INC "
+                . "(you may need to install the %s module) "
+                . "(\@INC contains: %s)"
+                . " at %s line %d.\n",
+                $filename, $module, "@INC", __FILE__, __LINE__ + 2
+            );
         eval { CORE::require($filename) };
         is( $@, $expected_error, "Failed to require $filename" );
         local %inc = %INC;
