@@ -13,7 +13,7 @@ package filename;
     # use the more succinct:
     use filename '/path/to/file.pm';
 
-    # Or, if you need to do include a file relative to the program:
+    # Or, if you need to include a file relative to the program:
     use FindBin qw($Bin);
     use filename "$Bin/../lib/Application.pm";
 
