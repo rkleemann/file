@@ -2,7 +2,12 @@ Revision history for file.
 
 {{$NEXT}}
 
- - Use `locale` to fix issues with $!.
+ - Handle refs in @INC.
+ - Minimum Perl is now v5.10.1.
+
+v0.20.010 2020-01-10
+
+ - Use locale to fix issues with $!.
  - Fix $VERSION for older Perls.
 
 v0.20.009 2020-01-09
