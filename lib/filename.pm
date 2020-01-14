@@ -1,4 +1,6 @@
 
+use v5.10.1;
+
 use strict;
 use warnings;
 
@@ -37,8 +39,9 @@ rather than at runtime.
 
 =cut
 
-use Carp 1.50  ();
-use File::Spec ();
+use Carp 1.50    ();
+use File::Spec   ();
+use Scalar::Util ();    #qw( blessed refaddr );
 
 
 # VERSION
