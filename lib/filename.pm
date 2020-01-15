@@ -155,9 +155,10 @@ $check_inc = sub {
 my $do_text = <<'END';
 package $pkg;
 my $result = do($fullpath);
-die $@ if $@;
 $INC{$filename} = delete $INC{$fullpath}
     if $filename ne $fullpath && exists $INC{$fullpath};
+$INC{$filename} &&= undef if $@;
+die $@ if $@;
 $result;
 END
 $do = sub {
@@ -172,8 +173,8 @@ $do = sub {
 my $eval_text = <<'END';
 package $pkg;
 my $result = eval $code;
+$INC{$filename} = $@ ? undef : $inc;
 die $@ if $@;
-$INC{$filename} = $inc;
 $result;
 END
 $eval = sub {
@@ -196,9 +197,11 @@ $error = sub {
     my $filename = @_ ? shift : $_;
     my $fullpath = @_ ? shift : $filename;
 
-    $INC{$filename} &&= undef($!); # $! is invalid if $INC{$filename} is true.
-
     $@ && Carp::croak( $@, "Compilation failed in require" );
+
+    # $INC{$filename} shouldn't be set if we've gotten here,
+    # and $! is invalid if $INC{$filename} is true.
+    delete $INC{$filename} && undef($!);
 
     $! && Carp::croak(
         "Can't locate $filename:   ",

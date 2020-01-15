@@ -4,6 +4,8 @@ Revision history for file.
 
  - Handle refs in @INC.
  - Minimum Perl is now v5.10.1.
+ - Fixed mistakes in test methodology.
+   - Fixed the errors those corrected tests found.
 
 v0.20.010 2020-01-10
 
