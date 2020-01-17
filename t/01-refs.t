@@ -7,9 +7,8 @@ use Test2::V0;
 ok( require filename, "Can require filename module" );
 ok( require pm,       "Can require pm module" );
 
-our %inc = %INC;
-my %file = %inc;
-my %core = %inc;
+my %file = %INC;
+my %core = %INC;
 my %incs = (
     "filename->require" => \%file,
     "CORE::require"     => \%core,
@@ -20,7 +19,8 @@ my %incs = (
 my ( $file, $core ) = do {
     ( my $test = <<'END' ) =~ s/\s+//g;
 sub {
-    local %INC = %inc;
+    local $_ = shift() if @_;
+    %INC = %{ $incs{'require'} };
     my $return = eval { require };
     %{ $incs{'require'} } = %INC;
     die $@ if $@;
@@ -36,6 +36,8 @@ END
     ) );
 };
 
+my $noinc = bless {}, "Testing::WithoutINC";
+
 # Negative tests
 foreach my $inc (
     # CODE
@@ -46,7 +48,7 @@ foreach my $inc (
     "inc_func_scalar",
 
     # Object
-    bless \do{"Testing::WithoutINC"}, "Testing::WithoutINC",
+    $noinc,
 ) {
     note "\@INC now includes ", ref($inc) || $inc;
     local @INC = ( ref($inc) ? $inc : ( __PACKAGE__->can($inc) || $inc ) );
@@ -54,34 +56,40 @@ foreach my $inc (
 
     foreach my $pm (qw( good symlink )) {
 
-        my $module = sprintf( "Testing-%s", $pm );
-        $_ = my $filename = sprintf( "%s.pm", $module );
+        my $module
+            = $^V >= v5.18.0
+            ? sprintf(
+                "(you may need to install the Testing-%s module) ", $pm )
+            : "";
+        $_ = my $filename = sprintf( "Testing-%s.pm", $pm );
 
         {
-            local %INC = %INC;
+            my %pre = %core = %file = %INC;
 
             is( dies {&$file}, dies {&$core},
-                "Cannot filename->require $filename" );
+                "Cannot require $filename" );
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
+
+            %INC = %pre;
         }
 
         {
-            local %INC = %INC;
+            my %pre = %core = %file = %INC;
 
             my $expected_error
                 = Scalar::Util::blessed($inc)
                 ? sprintf(
                       qq!Can't locate object method "INC" via package "%s"!
                     . qq! at %s line %d.\n!,
-                    ${$inc}, __FILE__, __LINE__ + 9
+                    ref($inc), __FILE__, __LINE__ + 9
                 )
                 : sprintf(
                       "Can't locate %s in \@INC "
-                    . "(you may need to install the %s module) "
+                    . $module
                     . "(\@INC contains: %s)"
                     . " at %s line %d.\n",
-                    $filename, $module, "@INC", __FILE__, __LINE__ + 2
+                    $filename, "@INC", __FILE__, __LINE__ + 2
                 );
             is( dies { CORE::require($filename) }, $expected_error,
                 "Failed to require $filename" );
@@ -94,14 +102,17 @@ foreach my $inc (
                         : "undefined"
                 );
 
-            local %inc = %INC;
             is( dies {&$file}, dies {&$core},
-                "Trying to re-filename->require $filename" );
+                "Trying to re-require $filename" );
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
+
+            %INC = %pre;
         }
     }
 }
+
+my $withinc = bless {}, "Testing::INC";
 
 # Positive tests
 foreach my $inc (
@@ -130,7 +141,7 @@ foreach my $inc (
     [ \&inc_func_coderef, "Testing", 123 ],
 
     # Object
-    bless \do{"Testing::INC"}, "Testing::INC",
+    $withinc,
 
 ) {
     note "\@INC now includes ", ref($inc) || $inc;
@@ -142,10 +153,12 @@ foreach my $inc (
     foreach my $pm (qw( good symlink )) {
         $_ = my $filename = sprintf( "Testing-%s.pm", $pm );
 
-        local %INC = %INC;
+        my %pre = %core = %file = %INC;
 
-        is( &$file, &$core, "Can filename->require $filename" );
+        is( &$file, &$core, "Can require $filename" );
         is( \%file, \%core, "%INC is the same for filename and CORE" );
+
+        %INC = %pre;
     }
 
     # Tests with bad files
@@ -161,18 +174,20 @@ foreach my $inc (
         $_ = my $filename = sprintf( "%s.pm", $module );
 
         {
-            local %INC = %INC;
+            my %pre = %core = %file = %INC;
 
             my ( $fdie, $cdie ) = ( dies {&$file}, dies {&$core} );
             s!/loader/0x[[:xdigit:]]+/!/loader/0xXXX/! for ( $fdie, $cdie );
             is( $fdie, $cdie,
-                "Cannot filename->require $filename" );
+                "Cannot require $filename" );
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
+
+            %INC = %pre;
         }
 
         {
-            local %INC = %INC;
+            my %pre = %core = %file = %INC;
 
             my $expected_error = sprintf(
                 "%s did not return a true value at %s line %d.\n",
@@ -189,11 +204,12 @@ foreach my $inc (
                         : "undefined"
                 );
 
-            local %inc = %INC;
             is( dies {&$file}, dies {&$core},
-                "Trying to re-filename->require $filename" );
+                "Trying to re-require $filename" );
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
+
+            %INC = %pre;
         }
     }
 
@@ -205,7 +221,7 @@ foreach my $inc (
         my $module = sprintf( "Testing-%s", $pm );
         $_ = my $filename = sprintf( "%s.pm", $module );
 
-        local %INC = %INC;
+        my %pre = %core = %file = %INC;
 
         my ( $fdie, $cdie ) = ( dies {&$file}, dies {&$core} );
         for my $die ( $fdie, $cdie ) {
@@ -243,6 +259,8 @@ foreach my $inc (
         is( dies {&$file}, dies {&$core},
             "Trying to re-filename->require $filename" );
         is( \%file, \%core, "%INC is the same for filename and CORE" );
+
+        %INC = %pre;
     }
 }
 
