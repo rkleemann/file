@@ -66,14 +66,20 @@ sub require {
     my $filename = @_ ? shift : $_;
     Carp::croak("Null filename used") unless length($filename);
 
-    return $INC{$filename} if ( exists $INC{$filename} );
+    if ( exists $INC{$filename} ) {
+        return 1 if $INC{$filename};
+        Carp::croak(
+              "Attempt to reload $filename aborted.\n"
+            . "Compilation failed in require"
+        );
+    }
 
     if ( File::Spec->file_name_is_absolute($filename) ) {
         goto NOT_INC if $^V < v5.17.0 && !-r $filename;
         return $do->($filename);
     }
     foreach my $inc (@INC) {
-        my ( $fullpath ) = $check_inc->( $inc, $filename );
+        my $fullpath = $check_inc->( $inc, $filename );
         next unless length($fullpath);
         return ref($fullpath)
             ? $eval->( $$fullpath => $filename, $inc )
@@ -157,8 +163,10 @@ package $pkg;
 my $result = do($fullpath);
 $INC{$filename} = delete $INC{$fullpath}
     if $filename ne $fullpath && exists $INC{$fullpath};
-$INC{$filename} &&= undef if $@;
-die $@ if $@;
+if ($@) {
+    $INC{$filename} &&= undef;
+    die $@;
+}
 $result;
 END
 $do = sub {
