@@ -87,12 +87,14 @@ sub require {
     }
     NOT_INC:
     my $module = '';
-    if ( ( my $pm = $filename ) =~ s/\.pm\z// ) {
-        $pm =~ s!/!::!g;
-        $module = $pm;
+    if ( $^V >= v5.18.0 ) {
+        if ( ( my $pm = $filename ) =~ s/\.pm\z// ) {
+            $pm =~ s!/!::!g;
+            $module = $pm;
+        }
+        $module = "(you may need to install the $module module) "
+            if $module;
     }
-    $module = "(you may need to install the $module module) "
-        if $module;
     Carp::croak("Can't locate $filename in \@INC $module(\@INC contains: @INC)");
 }
 
