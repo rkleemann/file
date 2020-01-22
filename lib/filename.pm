@@ -6,6 +6,8 @@ use warnings;
 
 use locale;    # localize $!
 
+use Array::RefElem ();  #qw( hv_store );
+
 package filename;
 # ABSTRACT: Perl module to load files at compile-time, without BEGIN blocks.
 
@@ -166,7 +168,7 @@ my $result = do($fullpath);
 $INC{$filename} = delete $INC{$fullpath}
     if $filename ne $fullpath && exists $INC{$fullpath};
 if ($@) {
-    $INC{$filename} &&= undef;
+    $INC{$filename} && Array::RefElem::hv_store( %INC, $filename, undef );
     die $@;
 }
 $result;
@@ -183,7 +185,7 @@ $do = sub {
 my $eval_text = <<'END';
 package $pkg;
 my $result = eval $code;
-$INC{$filename} = $@ ? undef : $inc;
+Array::RefElem::hv_store( %INC, $filename, $@ ? undef : $inc );
 die $@ if $@;
 $result;
 END

@@ -1,28 +1,32 @@
 #! /usr/bin/env perl
 
-use FindBin ();
+use Array::RefElem ();    #qw( hv_store );
+use FindBin        ();    #qw( $Bin );
+use Scalar::Util   ();    #qw( blessed );
 
 use Test2::V0;
 
 ok( require filename, "Can require filename module" );
 ok( require pm,       "Can require pm module" );
 
-my %file = %INC;
 my %core = %INC;
+my %file = %INC;
+my %inc  = %INC;
 my %incs = (
-    "filename->require" => \%file,
     "CORE::require"     => \%core,
+    "filename->require" => \%file,
+    "inc"               => \%inc,
 );
 
 # This hack is because I need them to report the same error message,
 # including filename and line number.
-my ( $file, $core ) = do {
+my ( $core, $file ) = do {
     ( my $test = <<'END' ) =~ s/\s+//g;
 sub {
     local $_ = shift() if @_;
-    %INC = %{ $incs{'require'} };
+    _restore_INC('require');
     my $return = eval { require };
-    %{ $incs{'require'} } = %INC;
+    _save_INC('require');
     die $@ if $@;
     return $return;
 }
@@ -30,11 +34,24 @@ END
     eval( join(
         ",",
         map { ( my $sub = $test ) =~ s/require/$_/g; $sub } qw(
-            filename->require
             CORE::require
+            filename->require
         )
     ) );
 };
+
+sub _save_INC {
+    @_ = ("inc") unless @_;
+    local $_;
+    %{ $incs{$_} } = %INC foreach @_;
+}
+sub _restore_INC {
+    %INC = %{ $incs{ shift() // "inc" } };
+    local $_;
+    Array::RefElem::hv_store( %INC, $_, undef )
+        foreach grep { not defined $INC{$_} } keys %INC;
+    return %INC;
+}
 
 my $noinc = bless {}, "Testing::WithoutINC";
 
@@ -64,18 +81,18 @@ foreach my $inc (
         $_ = my $filename = sprintf( "Testing-%s.pm", $pm );
 
         {
-            my %pre = %core = %file = %INC;
+            _save_INC(qw( CORE::require filename->require ));
 
             is( dies {&$file}, dies {&$core},
-                "Cannot require $filename" );
+                "Cannot require $filename with $inc" );
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
 
-            %INC = %pre;
+            _restore_INC();
         }
 
         {
-            my %pre = %core = %file = %INC;
+            _save_INC(qw( CORE::require filename->require ));
 
             my $expected_error
                 = Scalar::Util::blessed($inc)
@@ -92,7 +109,7 @@ foreach my $inc (
                     $filename, "@INC", __FILE__, __LINE__ + 2
                 );
             is( dies { CORE::require($filename) }, $expected_error,
-                "Failed to require $filename" );
+                "Failed to require $filename with $inc" );
             is( exists $INC{$filename}, "",
                 "%INC has not been updated for $filename" )
                 || diag(
@@ -107,7 +124,7 @@ foreach my $inc (
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
 
-            %INC = %pre;
+            _restore_INC();
         }
     }
 }
@@ -153,12 +170,12 @@ foreach my $inc (
     foreach my $pm (qw( good symlink )) {
         $_ = my $filename = sprintf( "Testing-%s.pm", $pm );
 
-        my %pre = %core = %file = %INC;
+        _save_INC(qw( CORE::require filename->require ));
 
         is( &$file, &$core, "Can require $filename" );
         is( \%file, \%core, "%INC is the same for filename and CORE" );
 
-        %INC = %pre;
+        _restore_INC();
     }
 
     # Tests with bad files
@@ -174,27 +191,30 @@ foreach my $inc (
         $_ = my $filename = sprintf( "%s.pm", $module );
 
         {
-            my %pre = %core = %file = %INC;
+            _save_INC(qw( CORE::require filename->require ));
 
             my ( $fdie, $cdie ) = ( dies {&$file}, dies {&$core} );
-            s!/loader/0x[[:xdigit:]]+/!/loader/0xXXX/! for ( $fdie, $cdie );
+            if ( $inc !~ /_scalarref_/ ) {
+                s!/loader/0x[[:xdigit:]]+/!/loader/0xXXX/!
+                    for ( $fdie, $cdie );
+            }
             is( $fdie, $cdie,
-                "Cannot require $filename" );
+                "Cannot require $filename with $inc" );
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
 
-            %INC = %pre;
+            _restore_INC();
         }
 
         {
-            my %pre = %core = %file = %INC;
+            _save_INC(qw( CORE::require filename->require ));
 
             my $expected_error = sprintf(
                 "%s did not return a true value at %s line %d.\n",
                 $filename, __FILE__, __LINE__ + 2
             );
             is( dies { CORE::require($filename) }, $expected_error,
-                "Failed to require $filename" );
+                "Failed to require $filename with $inc" );
             is( exists $INC{$filename}, "",
                 "%INC has not been updated for $filename" )
                 || diag(
@@ -209,7 +229,7 @@ foreach my $inc (
             is( \%file, \%core,
                 "%INC is the same for filename and CORE" );
 
-            %INC = %pre;
+            _restore_INC();
         }
     }
 
@@ -221,46 +241,53 @@ foreach my $inc (
         my $module = sprintf( "Testing-%s", $pm );
         $_ = my $filename = sprintf( "%s.pm", $module );
 
-        my %pre = %core = %file = %INC;
+        _save_INC(qw( CORE::require filename->require ));
 
-        my ( $fdie, $cdie ) = ( dies {&$file}, dies {&$core} );
-        for my $die ( $fdie, $cdie ) {
-            $die =~ s!/loader/0x[[:xdigit:]]+/!/loader/0xXXX/!;
-            $die =~ s!line \d+,!line N,!;
-        }
-        is( $fdie, $cdie,
-            "Cannot filename->require $filename" );
-        is( \%file, \%core, "%INC is the same for filename and CORE" );
+        is( { map { $_ => $INC{$_} } grep /Testing/, keys %INC }, {},
+            "%INC has no Testing" );
 
-        is( exists $INC{$filename}, "",
-            "%INC is not set for $filename" )
-            || diag(
-                "\$INC{$filename} is ",
-                defined( $INC{$filename} ) ? $INC{$filename} : "undefined"
-            );
-        my $error_filename
+        my $load_file
             = $inc =~ /_scalarref_/
-            ? quotemeta( __FILE__ . "/" )
-            : "/loader/0x[[:xdigit:]]+/";
-        my $expected_error = sprintf(
-              "syntax error at $error_filename%s line \\d+, at EOF\n"
-            . "Compilation failed in require at %s line %d\.\n",
-            map quotemeta, $filename, __FILE__, __LINE__ + 2
+            ? quotemeta( sprintf( "%s/%s", __FILE__, $filename ) )
+            : sprintf( "/loader/0x[[:xdigit:]]+/%s", quotemeta($filename) );
+        my @expected_errors = (
+            sprintf(
+                  "syntax error at %s line \\d, at EOF\n"
+                . "Compilation failed in require at %s line %d.\n",
+                $load_file, map quotemeta, __FILE__, __LINE__ + 9
+            ),
+            sprintf(
+                  "Attempt to reload %s aborted.\n"
+                . "Compilation failed in require at %s line %d.\n",
+                map quotemeta, $filename, __FILE__, __LINE__ + 4
+            ),
         );
-        like( dies { CORE::require($filename) }, qr/\A$expected_error\z/s,
-            "Failed to require $filename" )
-            or diag("inc is $inc");
-        is( exists $INC{$filename}, 1,
-            "%INC has been updated for $filename" );
-        is( $INC{$filename}, undef,
-            "\$INC{$filename} is undef" );
+        for my $expected_error (@expected_errors) {
+            like( dies { CORE::require }, qr/\A$expected_error\z/,
+                "Failed to require $filename with $inc" );
+            is( exists $INC{$filename}, 1,
+                "%INC has been updated for $filename" );
+            is( $INC{$filename}, undef,
+                "\$INC{$filename} is undef" );
+        }
 
-        local %inc = %INC;
-        is( dies {&$file}, dies {&$core},
-            "Trying to re-filename->require $filename" );
+        my $die = sprintf(
+              "syntax error at %s line \\d+, at EOF\n"
+            . "Compilation failed in require at \\(eval \\d+\\) line 1\\.\n",
+            $load_file, map quotemeta, __FILE__, __LINE__ + 2
+        );
+        my ( $fdie, $cdie ) = ( dies {&$file}, dies {&$core} );
+        like( $fdie, qr/\A$die\z/,
+            "Cannot require $filename with $inc" );
+        like( $fdie, qr/\A$die\z/,
+            "Cannot require $filename with $inc" );
         is( \%file, \%core, "%INC is the same for filename and CORE" );
 
-        %INC = %pre;
+        is( dies {&$file}, dies {&$core},
+            "Trying to re-require $filename" );
+        is( \%file, \%core, "%INC is the same for filename and CORE" );
+
+        _restore_INC();
     }
 }
 

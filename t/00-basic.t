@@ -1,28 +1,32 @@
 #! /usr/bin/env perl
 
-use FindBin ();
+use Array::RefElem ();    #qw( hv_store );
+use FindBin        ();    #qw( $Bin );
+
 
 use Test2::V0;
 
 ok( require filename, 'Can require filename module' );
 ok( require pm,       'Can require pm module' );
 
-my %file = %INC;
 my %core = %INC;
+my %file = %INC;
+my %inc  = %INC;
 my %incs = (
-    'filename->require' => \%file,
-    'CORE::require'     => \%core,
+    "CORE::require"     => \%core,
+    "filename->require" => \%file,
+    "inc"               => \%inc,
 );
 
 # This hack is because I need them to report the same error message,
 # including filename and line number.
-my ( $file, $core ) = do {
+my ( $core, $file ) = do {
     ( my $test = <<'END' ) =~ s/\s+//g;
 sub {
     local $_ = shift() if @_;
-    %INC = %{ $incs{'require'} };
+    _restore_INC('require');
     my $return = eval { require };
-    %{ $incs{'require'} } = %INC;
+    _save_INC('require');
     die $@ if $@;
     return $return;
 }
@@ -30,11 +34,24 @@ END
     eval( join(
         ',',
         map { ( my $sub = $test ) =~ s/require/$_/g; $sub } qw(
-            filename->require
             CORE::require
+            filename->require
         )
     ) );
 };
+
+sub _save_INC {
+    @_ = ("inc") unless @_;
+    local $_;
+    %{ $incs{$_} } = %INC foreach @_;
+}
+sub _restore_INC {
+    %INC = %{ $incs{ shift() // "inc" } };
+    local $_;
+    Array::RefElem::hv_store( %INC, $_, undef )
+        foreach grep { not defined $INC{$_} } keys %INC;
+    return %INC;
+}
 
 foreach my $inc ( $FindBin::Bin ) {
     note "\@INC now includes ", $inc;
@@ -47,7 +64,7 @@ foreach my $inc ( $FindBin::Bin ) {
             $_ = my $filename = sprintf( '%sTesting-%s.pm', $prefix, $pm );
 
             {
-                my %pre = %file = %core = %INC;
+                _save_INC(qw( CORE::require filename->require ));
 
                 is( &$file, &$core, "Can require $filename" );
                 is( \%file, \%core,
@@ -56,7 +73,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 is( \%file, \%core,
                     "%INC is still the same for filename and CORE" );
 
-                %INC = %pre;
+                _restore_INC();
             }
 
             my $statname = ( $prefix ? "" : "$FindBin::Bin/" ) . $filename;
@@ -64,7 +81,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 || die "Cannot stat $statname";
             chmod( 00000, $statname ) or die "Could not chmod $statname: $!";
             {
-                my %pre = %file = %core = %INC;
+                _save_INC(qw( CORE::require filename->require ));
 
                 my ( $fdie, $cdie ) = ( dies {&$file}, dies {&$core} );
                 ok( length($fdie), "file died with message" )
@@ -97,7 +114,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 is( \%file, \%core,
                     '%INC is the same for filename and CORE' );
 
-                %INC = %pre;
+                _restore_INC();
             }
             chmod( $mode, $statname ) or die "Could not chmod $statname: $!";
         }
@@ -115,18 +132,18 @@ foreach my $inc ( $FindBin::Bin ) {
             my $fullpath = $prefix ? $filename : "$FindBin::Bin/$filename";
 
             {
-                my %pre = %file = %core = %INC;
+                _save_INC(qw( CORE::require filename->require ));
 
                 is( dies {&$file}, dies {&$core},
                     "Cannot require $filename" );
                 is( \%file, \%core,
                     '%INC is the same for filename and CORE' );
 
-                %INC = %pre;
+                _restore_INC();
             }
 
             {
-                my %pre = %file = %core = %INC;
+                _save_INC(qw( CORE::require filename->require ));
 
                 ok( length( dies { CORE::require } ),
                     "Failed to require $filename" );
@@ -144,7 +161,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 is( \%file, \%core,
                     "%INC is the same for filename and CORE" );
 
-                %INC = %pre;
+                _restore_INC();
             }
         }
 
@@ -156,18 +173,18 @@ foreach my $inc ( $FindBin::Bin ) {
             my $fullpath = $prefix ? $filename : "$FindBin::Bin/$filename";
 
             {
-                my %pre = %file = %core = %INC;
+                _save_INC(qw( CORE::require filename->require ));
 
                 is( dies {&$file}, dies {&$core},
                     "Cannot require $filename" );
                 is( \%file, \%core,
                     "%INC is the same for filename and CORE" );
 
-                %INC = %pre;
+                _restore_INC();
             }
 
             {
-                my %pre = %file = %core = %INC;
+                _save_INC(qw( CORE::require filename->require ));
 
                 is( { map { $_ => $INC{$_} } grep /Testing/, keys %INC }, {},
                     "%INC has no Testing" );
@@ -192,18 +209,14 @@ foreach my $inc ( $FindBin::Bin ) {
                     is( $INC{$filename}, undef,
                         "\$INC{$filename} is undef" );
                 }
-                %file = %core = %INC;
+                _save_INC(qw( CORE::require filename->require ));
 
-                # There appears to be a bug in CORE::require
-                # where it's not failing correctly for this case.
-                # This test is commented out until a fix
-                # or workaround is determined.
-                #is( dies {&$file}, dies {&$core},
-                #    "Trying to re-require $filename" );
-                #is( \%file, \%core,
-                #    "%INC is the same for filename and CORE" );
+                is( dies {&$file}, dies {&$core},
+                    "Trying to re-require $filename" );
+                is( \%file, \%core,
+                    "%INC is the same for filename and CORE" );
 
-                %INC = %pre;
+                _restore_INC();
             }
         }
     }
