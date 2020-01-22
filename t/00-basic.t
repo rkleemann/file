@@ -6,8 +6,8 @@ use FindBin        ();    #qw( $Bin );
 
 use Test2::V0;
 
-ok( require filename, 'Can require filename module' );
-ok( require pm,       'Can require pm module' );
+ok( require filename, "Can require filename module" );
+ok( require pm,       "Can require pm module" );
 
 my %core = %INC;
 my %file = %INC;
@@ -32,7 +32,7 @@ sub {
 }
 END
     eval( join(
-        ',',
+        ",",
         map { ( my $sub = $test ) =~ s/require/$_/g; $sub } qw(
             CORE::require
             filename->require
@@ -61,14 +61,14 @@ foreach my $inc ( $FindBin::Bin ) {
 
         # Tests with good files
         foreach my $pm (qw( good symlink )) {
-            $_ = my $filename = sprintf( '%sTesting-%s.pm', $prefix, $pm );
+            $_ = my $filename = sprintf( "%sTesting-%s.pm", $prefix, $pm );
 
             {
                 _save_INC(qw( CORE::require filename->require ));
 
                 is( &$file, &$core, "Can require $filename" );
                 is( \%file, \%core,
-                    '%INC is the same for filename and CORE' );
+                    "%INC is the same for filename and CORE" );
                 is( &$file, &$core, "Can re-require $filename" );
                 is( \%file, \%core,
                     "%INC is still the same for filename and CORE" );
@@ -97,7 +97,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 is( $fdie, $cdie,
                     "Cannot require unreadable $filename" );
                 is( \%file, \%core,
-                    '%INC is the same for filename and CORE' );
+                    "%INC is the same for filename and CORE" );
 
                 is( exists $INC{$filename}, "",
                     "%INC has not been updated for $filename" )
@@ -112,7 +112,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 is( dies {&$file}, dies {&$core},
                     "Trying to re-require an unreadable file fails" );
                 is( \%file, \%core,
-                    '%INC is the same for filename and CORE' );
+                    "%INC is the same for filename and CORE" );
 
                 _restore_INC();
             }
@@ -128,7 +128,7 @@ foreach my $inc ( $FindBin::Bin ) {
             false
             undef
         )) {
-            $_ = my $filename = sprintf( '%sTesting-%s.pm', $prefix, $pm );
+            $_ = my $filename = sprintf( "%sTesting-%s.pm", $prefix, $pm );
             my $fullpath = $prefix ? $filename : "$FindBin::Bin/$filename";
 
             {
@@ -137,7 +137,7 @@ foreach my $inc ( $FindBin::Bin ) {
                 is( dies {&$file}, dies {&$core},
                     "Cannot require $filename" );
                 is( \%file, \%core,
-                    '%INC is the same for filename and CORE' );
+                    "%INC is the same for filename and CORE" );
 
                 _restore_INC();
             }

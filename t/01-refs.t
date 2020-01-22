@@ -249,7 +249,8 @@ foreach my $inc (
         my $load_file
             = $inc =~ /_scalarref_/
             ? quotemeta( sprintf( "%s/%s", __FILE__, $filename ) )
-            : sprintf( "/loader/0x[[:xdigit:]]+/%s", quotemeta($filename) );
+            : sprintf( "\\/loader\\/0x[[:xdigit:]]+\\/%s",
+                quotemeta($filename) );
         my @expected_errors = (
             sprintf(
                   "syntax error at %s line \\d, at EOF\n"

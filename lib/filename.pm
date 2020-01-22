@@ -97,7 +97,8 @@ sub require {
         $module = "(you may need to install the $module module) "
             if $module;
     }
-    Carp::croak("Can't locate $filename in \@INC $module(\@INC contains: @INC)");
+    Carp::croak(
+        "Can't locate $filename in \@INC $module(\@INC contains: @INC)");
 }
 
 ### Private subs ###
@@ -114,8 +115,8 @@ $check_inc = sub {
                 );
         } else {
             $subref
-                = $ref eq 'ARRAY' ? $inc->[0]
-                : $ref eq 'CODE'  ? $inc
+                = $ref eq "ARRAY" ? $inc->[0]
+                : $ref eq "CODE"  ? $inc
                 :                   return;
         }
         my @elems = $subref->( $inc, $filename );
@@ -126,14 +127,14 @@ $check_inc = sub {
         # CODE   - Code to execute with IO
         # REF    - State for CODE
 
-        my $code = '';
+        my $code = "";
         if ( $elem_ref eq "SCALAR" ) {
             $code = ${ shift @elems };
             $elem_ref = ref( $elems[0] );
         }
 
         my $fh = undef;
-        if ( $elem_ref eq 'GLOB' ) {
+        if ( $elem_ref eq "GLOB" ) {
             $fh = shift @elems;
             $fh = *{$fh}{IO};
             $elem_ref = ref( $elems[0] );
@@ -195,7 +196,7 @@ $eval = sub {
     my $inc      = @_ ? shift : $filename;
     my ($pkg)    = caller(2);
 
-    my $tmpfile = sprintf( '/loader/0x%x/%s',
+    my $tmpfile = sprintf( "/loader/0x%x/%s",
         Scalar::Util::refaddr( \$code ),
         $filename
     );
