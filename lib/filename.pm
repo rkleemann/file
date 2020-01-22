@@ -88,8 +88,8 @@ sub require {
             : $do->( $fullpath => $filename );
     }
     NOT_INC:
-    my $module = '';
-    if ( $^V >= v5.18.0 ) {
+    my $module = "";
+    if ( v5.18.0 <= $^V && $^V < v5.26.0 ) {
         if ( ( my $pm = $filename ) =~ s/\.pm\z// ) {
             $pm =~ s!/!::!g;
             $module = $pm;

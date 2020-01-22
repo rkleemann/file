@@ -74,7 +74,7 @@ foreach my $inc (
     foreach my $pm (qw( good symlink )) {
 
         my $module
-            = $^V >= v5.18.0
+            = v5.18.0 <= $^V && $^V < v5.26.0
             ? sprintf(
                 "(you may need to install the Testing-%s module) ", $pm )
             : "";
@@ -274,7 +274,7 @@ foreach my $inc (
         my $die = sprintf(
               "syntax error at %s line \\d+, at EOF\n"
             . "Compilation failed in require at \\(eval \\d+\\) line 1\\.\n",
-            $load_file, map quotemeta, __FILE__, __LINE__ + 2
+            $load_file
         );
         my ( $fdie, $cdie ) = ( dies {&$file}, dies {&$core} );
         like( $fdie, qr/\A$die\z/,

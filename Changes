@@ -6,7 +6,7 @@ Revision history for file.
  - Minimum Perl is now v5.10.1.
  - Fixed mistakes in test methodology.
    - Fixed the errors those corrected tests found.
- - Use Array::RefElem::hv_store to populate undef in %INC when needed.
+ - Use Array::RefElem::hv_store() to populate undef in %INC when needed.
 
 v0.20.010 2020-01-10
 
