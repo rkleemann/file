@@ -1,12 +1,10 @@
 
-use v5.10.1;
+use v5.12.0;
 
 use strict;
 use warnings;
 
 use locale;    # localize $!
-
-use Array::RefElem ();  #qw( hv_store );
 
 package filename;
 # ABSTRACT: Perl module to load files at compile-time, without BEGIN blocks.
@@ -41,9 +39,10 @@ rather than at runtime.
 
 =cut
 
-use Carp 1.50    ();
-use File::Spec   ();
-use Scalar::Util ();    #qw( blessed refaddr );
+use Array::RefElem ();    #qw( hv_store );
+use Carp 1.50      ();
+use File::Spec     ();
+use Scalar::Util   ();    #qw( blessed refaddr );
 
 
 # VERSION

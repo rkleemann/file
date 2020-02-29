@@ -1,6 +1,11 @@
-Revision history for file.
+Revision history for filename.
 
 {{$NEXT}}
+
+ - Require 5.12, as 5.10 appears to have issues.
+ - Improved tests, which might be able to pass or skip on MSWin32.
+
+v0.20.022 2020-01-22
 
  - Handle refs in @INC.
  - Minimum Perl is now v5.10.1.
